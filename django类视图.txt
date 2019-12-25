@@ -1,0 +1,150 @@
+
+------------------------------------------------------------------------------------------
+通用视图
+
+views.py
+
+from django.views.generic import ListView
+
+class ArticleListView(ListView):
+	# 上下文的名称
+	context_object_name = 'articles'
+	# 查询集
+	queryset = ArticlePost.objects.all()
+	# 模板位置
+	template_name = 'article/list.html'
+------------------------------------------------------------------------------------------
+动态过滤
+
+views.py
+
+...
+
+class ArticleListView(ListView):
+    context_object_name = 'articles'
+    template_name = 'article/list.html'
+
+    def get_queryset(self):
+        """
+        查询集
+        """
+        queryset = ArticlePost.objects.filter(title='Python')
+        return queryset
+------------------------------------------------------------------------------------------
+添加上下文
+
+views.py
+
+...
+
+class ArticleListView(ListView):
+    ...
+
+    def get_context_data(self, **kwargs):
+        # 获取原有的上下文
+        context = super().get_context_data(**kwargs)
+        # 增加新上下文
+        context['order'] = 'total_views'
+        return context
+------------------------------------------------------------------------------------------
+ListView还有些别的方法可以覆写，深入了解可以看这里：
+https://docs.djangoproject.com/zh-hans/2.1/ref/class-based-views/generic-display/#listview
+------------------------------------------------------------------------------------------
+混入类
+混入类（Mixin）是指具有某些功能、通常不独立使用、提供给其他类继承功能的类。
+
+views.py
+
+...
+
+class ContextMixin:
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['order'] = 'total_views'
+        return context
+
+class ArticleListView(ContextMixin, ListView):
+    ...
+
+class VideoListView(ContextMixin, ListView):
+    ...
+------------------------------------------------------------------------------------------
+详情页
+
+views.py
+
+from django.views.generic import DetailView
+
+class ArticleDetailView(DetailView):
+    queryset = ArticlePost.objects.all()
+    context_object_name = 'article'
+    template_name = 'article/detail.html'
+
+然后配置url：
+
+urls.py
+
+...
+urlpatterns = [
+    # 详情类视图
+    path('detail-view/<int:pk>/', views.ArticleDetailView.as_view(), name='...'),
+]
+
+注意这里传入的参数不是id而是pk，这是视图的要求（也可以传入slug）。
+pk是数据表的主键，在默认情况下其实就是id。
+
+关于DetailView更多特性看这里：
+https://docs.djangoproject.com/zh-hans/2.1/ref/class-based-views/generic-display/#detailview
+------------------------------------------------------------------------------------------
+编辑
+除了能够展示信息，通用视图还包含CreateView、UpdateView、DeleteView等编辑数据的类。
+------------------------------------------------------------------------------------------
+新建文章
+
+views.py
+
+from django.views.generic.edit import CreateView
+
+class ArticleCreateView(CreateView):
+    model = ArticlePost
+
+    fields = '__all__'
+    # 或者只填写部分字段，比如：
+    # fields = ['title', 'content']
+
+    template_name = 'article/create_by_class_view.html'
+
+创建create_by_class_view.html文件
+
+create_by_class_view.html
+
+<form method="post">{% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" value="Save">
+</form>
+
+添加url
+
+urls.py
+
+urlpatterns = [
+    path('create-view/', views.ArticleCreateView.as_view(), name='...'),
+]
+------------------------------------------------------------------------------------------
+编辑视图：
+https://docs.djangoproject.com/zh-hans/2.1/ref/class-based-views/generic-editing/
+------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+

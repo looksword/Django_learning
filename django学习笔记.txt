@@ -1,0 +1,2682 @@
+参考网站	https://www.dusaiphoto.com/article/detail/2/
+
+
+
+
+Python 3.7.0
+---------------------------------------------------------------------------------------
+配置虚拟环境
+1.新建一个文件夹
+2.输入配置venv的命令：	python -m venv env
+3.进入虚拟环境：	env\Scripts\activate.bat
+
+
+安装Django
+1.在虚拟环境下，输入命令：	pip install django==2.1.5
+
+
+还是在虚拟环境下，在django_project文件夹中创建Django项目
+1.django-admin startproject my_blog
+
+
+运行Django服务器（Django自带一个轻量的Web开发服务器，也被叫做“runserver”）
+1.进入my_blog文件夹，即含有manage.py文件的那个：cd my_blog	
+2.输入命令：	python manage.py runserver
+3.查看服务器：	打开浏览器，输入http://127.0.0.1:8000/
+
+
+
+
+---------------------------------------------------------------------------------------
+创建APP
+1.在虚拟环境下，my_blog文件夹里，输入指令：	python manage.py startapp article
+
+
+项目结构分解如下：
+1.根目录my_blog下有两个文件：
+	db.sqlite3是一个轻量级的数据库文件，用来存储项目产生的数据，比如博客文章；
+	manage.py是项目执行命令的入口，比如runserver。
+2.目录article是刚创建出来的app，用来放置博客文章相关的代码：
+	后台管理文件admin.py，
+	数据模型文件models.py，
+	视图文件views.py，
+	存放数据迁移文件的目录migrations。
+3.根目录下还有一个my_blog目录，其中：
+	settings.py包含项目的配置参数，
+	urls.py则是项目的根路由文件。
+
+
+注册APP（settings）
+1.打开my_blog目录的settings.py，找到INSTALLED_APPS写入如下代码：
+	my_blog/settings.py
+
+	INSTALLED_APPS = [
+		'django.contrib.admin',
+		'django.contrib.auth',
+		'django.contrib.contenttypes',
+		'django.contrib.sessions',
+		'django.contrib.messages',
+		'django.contrib.staticfiles',
+		# 新增'article'代码，激活app
+		'article',
+	]
+
+
+配置访问路径（urls）
+1.给app配置访问路径url（url可以理解为访问网站时输入的网址链接，配置好url后Django才知道怎样定位app）
+2.打开my_blog目录下的urls.py，增加以下代码：
+	my_blog/urls.py
+
+	from django.contrib import admin
+	# 记得引入include
+	from django.urls import path, include
+
+	# 存放映射关系的列表
+	urlpatterns = [
+		path('admin/', admin.site.urls),
+
+		# 新增代码，配置app的url
+		path('article/', include('article.urls', namespace='article')),
+	]
+3.path为Django的路由语法：
+	参数article/分配了app的访问路径；
+	include将路径分发给下一步处理；
+	namespace可以保证反查到唯一的url，即使不同的app使用了相同的url（后面会用到）。
+  在开发环境下，article的url为：http://127.0.0.1:8000/article/
+4.现在我们已经通过path将根路径为article的访问都分发给article这个app去处理。
+	但是app通常有多个页面地址，因此还需要app自己也有一个路由分发，也就是article.urls了。
+5.在app生成时并没有这个文件，因此需要自己在article文件夹中创建urls.py，在里面输入：
+	article/urls.py
+	
+	# 引入path
+	from django.urls import path
+
+	# 正在部署的应用的名称
+	app_name = 'article'
+
+	urlpatterns = [
+		# 目前还没有urls
+	]
+6.urlpatterns中暂时是空的，没写入任何路径的映射，不着急以后会写。
+7.注意此时app还没有写好，因此启动服务器可能会报错，是正常的。
+	Django2.0之后，app的urls.py必须配置app_name，否则会报错。
+
+
+
+
+---------------------------------------------------------------------------------------
+Django 框架主要关注的是模型（Model）、模板（Template）和视图（Views），称为MTV模式。
+简单来说就是Model存取数据，View决定需要调取哪些数据，而Template则负责将调取出的数据以合理的方式展现出来。
+
+
+数据库与模型
+1在 Django 里写Web应用并不需要你直接去操作数据库，
+	而是定义好模型（用Python语法就可以了！），模型中包含了操作数据库所必要的命令。
+	也就是说你只需要定义数据模型，其它的底层代码都不用关心，它们会自动从模型生成。（对象关系映射）
+
+
+编写Model.py
+1.建立一个存放文章的数据模型，打开article/models.py文件，输入如下代码：
+	article/models.py
+	
+	from django.db import models
+	# 导入内建的User模型。
+	from django.contrib.auth.models import User
+	# timezone 用于处理时间相关事务。
+	from django.utils import timezone
+
+	# 博客文章数据模型 每个模型都被表示为 django.db.models.Model 类的子类
+	class ArticlePost(models.Model):
+		# 文章作者。参数 on_delete 用于指定数据删除的方式
+		author = models.ForeignKey(User, on_delete=models.CASCADE)
+
+		# 文章标题。models.CharField 为字符串字段，用于保存较短的字符串，比如标题
+		title = models.CharField(max_length=100)
+
+		# 文章正文。保存大量文本使用 TextField
+		body = models.TextField()
+
+		# 文章创建时间。参数 default=timezone.now 指定其在创建数据时将默认写入当前的时间
+		created = models.DateTimeField(default=timezone.now)
+
+		# 文章更新时间。参数 auto_now=True 指定每次数据更新时自动写入当前时间
+		updated = models.DateTimeField(auto_now=True)
+
+		# 内部类 class Meta 用于给 model 定义元数据
+		class Meta:
+			# ordering 指定模型返回的数据的排列顺序
+			# '-created' 表明数据应该以倒序排列
+			ordering = ('-created',)
+
+		# 函数 __str__ 定义当调用对象的 str() 方法时的返回值内容
+		def __str__(self):
+			# return self.title 将文章标题返回
+			return self.title
+2.使用 ForeignKey定义一个关系。
+	这将告诉 Django，每个（或多个） ArticlePost 对象都关联到一个 User 对象。
+3.外键
+	ForeignKey			“一对多”关系
+	OneToOneField		“一对一”关系
+	ManyToManyField		“多对多”关系
+	Django2.0 之前的版本外键的on_delete参数可以不填；Django2.0以后on_delete是必填项。
+4.内部类
+	内部类class Meta提供模型的元数据。元数据是“任何不是字段的东西”，例如：
+	排序选项ordering、数据库表名db_table、单数和复数名称verbose_name和 verbose_name_plural。
+
+
+数据迁移（Migrations）
+1.注意，每当对数据库进行了更改（添加、修改、删除等）操作，都需要进行数据迁移。
+2.在虚拟环境中进入my_blog文件夹，输入指令：	python manage.py makemigrations
+3.然后输入python manage.py migrate，应用迁移到数据库中：
+4.migrate 命令选中所有还没有执行过的迁移并应用在数据库上，
+	也就是将模型的更改同步到数据库结构上。
+	迁移是非常强大的功能，
+	它能让你在开发过程中持续的改变数据库结构而不需要重新删除和创建表。
+	它专注于使数据库平滑升级而不会丢失数据。
+5.再重复一次：
+	每当你修改了models.py文件，都需要用makemigrations和migrate这两条指令迁移数据。
+
+
+
+
+---------------------------------------------------------------------------------------
+Django 中视图的概念是「一类具有相同功能和模板的网页的集合」。
+
+
+首先写一个最简单的视图函数，在浏览器中打印出Hello World!字符串。
+1.打开article/views.py，写出视图函数：
+	article/views.py
+	
+	# 导入 HttpResponse 模块
+	from django.http import HttpResponse
+
+	# 视图函数
+	def article_list(request):
+		return HttpResponse("Hello World!")
+2.网页都是从视图派生而来。
+	每一个视图表现为一个简单的Python函数，它必须要做的只有两件事：
+	返回一个包含被请求页面内容的 HttpResponse对象，
+	或者抛出一个异常，比如 Http404 。
+	至于你还想干些什么，随便你。
+3.视图函数中的request与网页发来的请求有关，里面包含get或post的内容、用户浏览器、系统等信息。
+	Django调用article_list函数时会返回一个含字符串的 HttpResponse对象。
+4.有了视图函数，还需要配置URLconfs，将用户请求的URL链接关联起来。
+	换句话说，URLconfs的作用是将URL映射到视图中。
+5.前面已经将URL分发给了article应用，因此这里只需要修改之前添加的article/urls.py就可以。
+	article/urls.py
+	
+	# 引入views.py
+	from . import views
+
+	...
+
+	urlpatterns = [
+		# path函数将url映射到视图
+		path('article-list/', views.article_list, name='article_list'),
+	]
+6.Django 将会根据用户请求的 URL 来选择使用哪个视图。
+	本例中当用户请求article/article-list链接时，
+	会调用views.py中的article_list函数，并返回渲染后的对象。
+	参数name用于反查url地址，相当于给url起了个名字，以后会用到。
+7.这时可以测试一下：
+	在虚拟环境中，进入项目目录，也就是my_blog文件夹：	python manage.py runserver
+	打开浏览器，输入http://127.0.0.1:8000/article/article-list/
+
+
+准备工作
+1.在章节编写Model模型中虽然定义了数据库表，但是这个表是空的，不方便展示View调取数据的效果。
+2.所以在写View之前，需要往数据表里记录一些数据。
+
+
+网站后台概念
+1.网站后台，有时也称为网站管理后台，是指用于管理网站的一系列操作，如：
+	数据的增加、更新、删除等。
+	在项目开发的初期，因为没有真实的用户数据和完整的测试环境，会频繁地使用后台修改测试数据。
+
+
+创建管理员账号（Superuser）
+1.管理员账号（Superuser）是可以进入网站后台，对数据进行维护的账号，具有很高的权限。
+	这里我们需要创建一个管理员账号，以便添加后续的测试数据。
+2.虚拟环境中my_blog文件夹里输入python manage.py createsuperuser指令，创建管理员账号
+3.looksword
+4.1003961499@qq.com
+5.WKJwkj537
+
+
+将ArticlePost注册到后台中
+1.接下来我们需要“告诉”Django，后台中需要添加ArticlePost这个数据表供管理。
+2.打开article/admin.py，写入以下代码：
+	article/admin.py
+	
+	from django.contrib import admin
+
+	# 别忘了导入ArticlerPost
+	from .models import ArticlePost
+
+	# 注册ArticlePost到admin中
+	admin.site.register(ArticlePost)
+
+
+在后台中遨游
+1.Django项目生成的时候就自动配置好了后台的settings和url
+2.启动server，在浏览器中输入http://127.0.0.1:8000/admin/
+3.输入刚才创建的管理员账号，登录进去
+4.点击进入刚才添加的ArticlePost数据表，再点击右上角的ADD ARTICLE POST按钮
+5.仔细看一下表单中的每一项，发现与ArticlePost中的字段完全符合；
+	因为updated字段指定了自动添加，这里就没显示了。
+6.保存没问题就大功告成了
+	之前出问题是因为sqlite的版本问题，
+	需要降级到2.6之前的版本，
+	怎么降级sqlite没找到，还好Django在2.1.5修复了这个bug
+
+
+检视数据库
+1.检查数据库中的数据是否正确
+2.专门处理SQLite数据文件的软件：SQLiteStudio
+
+
+
+
+---------------------------------------------------------------------------------------
+改写视图函数
+1.为了让视图真正发挥作用，改写article/views.py中的article_list视图函数：
+	article/views.py
+	
+	from django.shortcuts import render
+
+	# 导入数据模型ArticlePost
+	from .models import ArticlePost
+
+	def article_list(request):
+		# 取出所有博客文章
+		articles = ArticlePost.objects.all()
+		# 需要传递给模板（templates）的对象
+		context = { 'articles': articles }
+		# render函数：载入模板，并返回context对象
+		return render(request, 'article/list.html', context)
+2.从models.py中导入ArticlePost数据类
+3.ArticlePost.objects.all()是数据类的方法，可以获得所有的对象（即博客文章），并传递给articles变量
+4.context定义了需要传递给模板的上下文，这里即articles
+5.最后返回了render函数。它的作用是结合模板和上下文，并返回渲染后的HttpResponse对象。
+	通俗的讲就是把context的内容，加载进模板，并通过浏览器呈现。
+6.render的变量分解如下：
+	request是固定的request对象，照着写就可以
+	article/list.html定义了模板文件的位置、名称
+	context定义了需要传入模板文件的上下文
+
+
+编写模板（template）
+1.前面定义了模板的位置在article/list.html，
+	因此在根目录（包含article以及my_blog的目录）下新建templates文件夹，
+	再新建article文件夹，再新建list.html文件并写入：
+	templates/article/list.html
+	
+	{% for article in articles %}
+		<p>{{ article.title }}</p>
+	{% endfor %}
+
+
+配置模板位置
+1.在settings.py中，它保存了Django项目的各种初始配置
+2.找到TEMPLATES这一段，加入代码：
+	TEMPLATES = [
+		{
+			...
+			# 定义模板位置
+			'DIRS': [os.path.join(BASE_DIR, 'templates')],
+			...
+		},
+	]
+
+
+走通MTV（model、template、view）环路
+1.保存文件，重新启动服务器
+2.在浏览器中输入地址http://127.0.0.1:8000/article/article-list/
+
+
+
+
+---------------------------------------------------------------------------------------
+配置Bootstrap 4
+1.Bootstrap是用于网站开发的开源前端框架（“前端”指的是展现给最终用户的界面），
+	它提供字体排印、窗体、按钮、导航及其他各种组件，
+	旨在使动态网页和Web应用的开发更加容易。
+2.下载地址	https://getbootstrap.com/docs/4.1/getting-started/download/
+3.在项目根目录下新建目录static/bootstrap/，用于存放Bootstrap静态文件。
+4.把刚才下载并解压出来的css和js两个文件夹复制进去。
+5.因为bootstrap.js依赖 jquery.js 和 popper.js 才能正常运行，因此这两个文件我们也需要一并下载保存。
+6.下载地址	https://jquery.com/download/
+7.下载地址	https://popper.js.org/
+8.下载地址	https://unpkg.com/popper.js@1.14.4/dist/umd/popper.js
+9.在static文件夹下新建jquery和popper两个文件夹并放入文件
+10.因为在Django中需要指定静态文件的存放位置，才能够在模板中正确引用它们。
+	在settings.py的末尾加上：
+	my_blog/settings.py
+	
+	...
+
+	STATICFILES_DIRS = (
+		os.path.join(BASE_DIR, "static"),
+	)
+11.再确认一下settings.py中有没有STATIC_URL = '/static/'字段，如果没有把它也加在后面。
+
+
+编写模板
+1.在根目录下的templates/中，新建三个文件：
+	base.html是整个项目的模板基础，所有的网页都从它继承；
+	header.html是网页顶部的导航栏；
+	footer.html是网页底部的注脚。
+	这三个文件在每个页面中通常都是不变的，独立出来可以避免重复写同样的代码，提高维护性。
+2.Bootstrap官方文档	https://getbootstrap.com/docs/4.1/getting-started/introduction/
+3.base.html:
+	templates/base.html
+
+	<!-- 载入静态文件 -->
+	<!-- 模板中要加上 {% load staticfiles %} 之后，才可使用 {% static 'path' %} 引用静态文件。-->
+	{% load staticfiles %}
+
+	<!DOCTYPE html>
+	<!-- 网站主语言 -->
+	<html lang="zh-cn">
+
+	<head>
+		<!-- 网站采用的字符编码 -->
+		<meta charset="utf-8">
+		<!-- 预留网站标题的位置 -->
+		<title>{% block title %}{% endblock %}</title>
+		<!-- 引入bootstrap的css文件 -->
+		<link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+	</head>
+
+	<body>
+		<!-- 引入导航栏 -->
+		{% include 'header.html' %}
+		<!-- 预留具体页面的位置 -->
+		{% block content %}{% endblock content %}
+		<!-- 引入注脚 -->
+		{% include 'footer.html' %}
+		<!-- bootstrap.js 依赖 jquery.js 和popper.js，因此要在前面引入，注意与实际文件名称相同 -->
+		<script src="{% static 'jquery/jquery-3.4.1.js' %}"></script>
+		<script src="{% static 'popper/popper.js' %}"></script>    
+		<!-- 引入bootstrap的js文件 -->
+		<script src="{% static 'bootstrap/js/bootstrap.min.js' %}"></script>
+	</body>
+
+	</html>
+4.header.html：
+	templates/header.html
+	
+	<!-- 定义导航栏 -->
+	<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+	  <div class="container">
+
+		<!-- 导航栏商标 -->
+		<a class="navbar-brand" href="#">我的博客</a>
+
+		<!-- 导航入口 -->
+		<div>
+		  <ul class="navbar-nav">
+			<!-- 条目 -->
+			<li class="nav-item">
+			  <a class="nav-link" href="#">文章</a>
+			</li>
+		  </ul>
+		</div>
+
+	  </div>
+	</nav>
+5.改写之前的list.html：
+	templates/article/list.html
+
+	<!-- extends表明此页面继承自 base.html 文件 -->
+	{% extends "base.html" %}
+	{% load staticfiles %}
+
+	<!-- 写入 base.html 中定义的 title -->
+	{% block title %}
+		首页
+	{% endblock title %}
+
+	<!-- 写入 base.html 中定义的 content -->
+	{% block content %}
+
+	<!-- 定义放置文章标题的div容器 -->
+	<div class="container">
+		<div class="row mt-2">
+
+			{% for article in articles %}
+			<!-- 文章内容 -->
+			<div class="col-4 mb-4">
+			<!-- 卡片容器 -->
+				<div class="card h-100">
+					<!-- 标题 -->
+					<h4 class="card-header">{{ article.title }}</h4>
+					<!-- 摘要 -->
+					<div class="card-body">
+						<p class="card-text">{{ article.body|slice:'100' }}...</p>
+					</div>
+					<!-- 注脚 -->
+					<div class="card-footer">
+						<a href="#" class="btn btn-primary">阅读本文</a>
+					</div>
+				</div>
+			</div>
+			{% endfor %}
+
+		</div>
+	</div>
+	{% endblock content %}
+6.footer.html：
+	templates/footer.html
+	
+	{% load staticfiles %}
+	<!-- Footer -->
+	<div>
+		<br><br><br>
+	</div>
+	<footer class="py-3 bg-dark fixed-bottom">
+		<div class="container">
+			<p class="m-0 text-center text-white">Copyright &copy; looksword 2019</p>
+		</div>
+	</footer>
+
+
+总结：
+1.当我们通过url访问list.html时，
+	顶部的{% extends "base.html" %}告诉Django：“这个文件是继承base.html的，你去调用它吧。”
+2.于是Django就老老实实去渲染base.html文件：
+	其中的{% include 'header.html' %}表明这里需要加入header.html的内容
+	{% include 'footer.html' %}加入footer.html的内容
+	{% block content %}{% endblock content %}表明这里应该加入list.html中的对应块的内容
+3.引入了前端框架Bootstrap 4，借助它重新组织了模板的结构
+
+
+
+
+---------------------------------------------------------------------------------------
+编写视图函数
+1.打开article/views.py，增加文章详情页面的视图函数article_detail()：
+	article/views.py
+	
+	...
+
+	# 文章详情
+	def article_detail(request, id):
+		# 取出相应的文章
+		article = ArticlePost.objects.get(id=id)
+		# 需要传递给模板的对象
+		context = { 'article': article }
+		# 载入模板，并返回context对象
+		return render(request, 'article/detail.html', context)
+2.article_detail(request, id)函数中多了id这个参数。
+	注意我们在写model的时候并没有写叫做id的字段，
+	这是Django自动生成的用于索引数据表的主键（Primary Key，即pk）。
+3.然后编写article/urls.py，配置路由地址：
+	article/urls.py
+	
+	...
+
+	urlpatterns = [
+		...
+
+		# 文章详情
+		path('article-detail/<int:id>/', views.article_detail, name='article_detail'),
+	]
+4.<int:id>：Django2.0的path新语法用尖括号<>定义需要传递的参数。
+	这里需要传递名叫id的整数到视图函数中去。
+
+
+编写模板
+1.在templates/article/中新建detail.html文件，编写如下代码：
+	templates/article/detail.html
+
+	<!-- extends表明此页面继承自 base.html 文件 -->
+	{% extends "base.html" %}
+	{% load staticfiles %}
+
+	<!-- 写入 base.html 中定义的 title -->
+	{% block title %}
+		文章详情
+	{% endblock title %}
+
+	<!-- 写入 base.html 中定义的 content -->
+	{% block content %}
+
+	<!-- 文章详情 -->
+	<div class="container">
+		<div class="row">
+			<!-- 标题及作者 -->
+			<h1 class="col-12 mt-4 mb-4">{{ article.title }}</h1>
+			<div class="col-12 alert alert-success">作者：{{ article.author }}</div>
+			<!-- 文章正文 -->
+			<div class="col-12">
+				<p>{{ article.body }}</p>
+			</div>
+		</div>
+	</div>
+
+	{% endblock content %}
+
+
+优化网页入口
+1.改写header.html:
+	templates/header.html
+
+	...
+	<div>
+		<ul class="navbar-nav">
+			<li class="nav-item">
+
+				<!-- 改写了这里的 href --> 
+				<a class="nav-link" href="{% url 'article:article_list' %}">文章</a>
+
+			</li>
+		</ul>
+	</div>
+
+	...
+2.href定义了链接跳转的地址。
+3.{% url '...' %}是Django规定的模板解耦语法，
+	用它可以根据我们在urls.py中设置的名字，
+	反向解析到对应的url中去。
+4.	前面的article是在项目根目录的urls.py中定义的app的名称
+	后面的article_list是在app中的urls.py中定义的具体的路由地址
+5.改写list.html:
+	templates/article/list.html
+
+	...
+
+	<div class="card-footer">
+
+		<!-- 同样改写 href -->
+		<a href="{% url 'article:article_detail' article.id %}" class="btn btn-primary">阅读本文</a>
+
+	</div>
+
+	...
+6.id是如何传递的：
+	1.在list.html中，通过href="{% url 'article:article_detail' article.id %}"，将id传递给article/urls.py
+	2.在article/urls.py中，通过<int:id>传递给视图函数article_detail()
+	3.在视图函数article_detail()中，通过形参id取得了文章的id值，并进行处理，最终定位了需要获取的文章对象
+
+
+
+
+---------------------------------------------------------------------------------------
+安装Markdown
+1.Markdown是一种轻量级的标记语言，
+	它允许人们“使用易读易写的纯文本格式编写文档，
+	然后转换成有效的或者HTML文档。
+2.Markdown语法介绍	https://coding.net/help/doc/project/markdown.html
+3.安装：进入虚拟环境，输入指令pip install markdown即可
+
+
+使用Markdown
+1.改写article/views.py的article_detail()：
+	article/views.py
+
+	...
+
+	# 引入markdown模块
+	import markdown
+
+	def article_detail(request, id):
+		article = ArticlePost.objects.get(id=id)
+
+		# 将markdown语法渲染成html样式
+		article.body = markdown.markdown(article.body,
+			extensions=[
+			# 包含 缩写、表格等常用扩展
+			'markdown.extensions.extra',
+			# 语法高亮扩展
+			'markdown.extensions.codehilite',
+			])
+
+		context = { 'article': article }
+		return render(request, 'article/detail.html', context)
+2.修改templates/article/detail.html中有关文章正文的部分：
+	templates/article/detail.html
+
+	...
+
+	# 在 article.body 后加上 |safe 过滤器
+	<p>{{ article.body|safe }}</p>
+3.Django出于安全的考虑，会将输出的HTML代码进行转义，
+	这使得article.body中渲染的HTML文本无法正常显示。
+	管道符|是Django中过滤器的写法，而|safe就类似给article.body贴了一个标签，
+	表示这一段字符不需要进行转义了。
+4.启动服务器，在后台中新录入一条用markdown语法书写的文章，内容如下：
+	# 国风·周南·关雎
+	---
+	**关关雎鸠，在河之洲。窈窕淑女，君子好逑。**
+
+	参差荇菜，左右流之。窈窕淑女，寤寐求之。
+
+	---
+	+ 列表一
+	+ 列表二
+		+ 列表二-1
+		+ 列表二-2
+	---
+
+	```python
+	def article_detail(request, id):
+	    article = ArticlePost.objects.get(id=id)
+	    # 将markdown语法渲染成html样式
+	    article.body = markdown.markdown(article.body,
+	        extensions=[
+			# 包含 缩写、表格等常用扩展
+			'markdown.extensions.extra',
+			# 语法高亮扩展
+			'markdown.extensions.codehilite',
+			])
+		context = { 'article': article }
+		return render(request, 'article/detail.html', context)
+	​```
+
+
+代码高亮
+1.在static目录中新建一个目录md_css/，一会儿放置代码高亮的样式文件。
+2.进入虚拟环境，安装Pygments：pip install Pygments
+3.在命令行中进入刚才新建的md_css目录中，输入Pygments指令：
+	pygmentize -S monokai -f html -a .codehilite > monokai.css
+4.这里有一点需要注意, 生成命令中的 -a 参数需要与真实页面中的 CSS Selector 相对应，即.codehilite这个字段在有些版本中应写为.highlight。
+5.回车后检查一下，在md_css目录中是否自动生成了一个叫monokai.css的文件，这是一个深色背景的高亮样式文件。
+6.在base.html中引用这个文件：
+	templates/base.html
+
+	<head>
+		...
+		<link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+
+		<!-- 引入monikai.css -->
+		<link rel="stylesheet" href="{% static 'md_css/monokai.css' %}">
+
+	</head>
+	...
+7.代码最好手打，缩进使用四个空格
+
+
+
+
+
+---------------------------------------------------------------------------------------
+Forms表单类
+1.在HTML中，表单是在 <form>...</form> 中的一些元素，
+	它允许访客做类似输入文本、选择选项、操作对象或空间等动作，然后发送这些信息到服务端。
+2.Django表单系统的核心组件是 Form类，它能够描述一张表单并决定它如何工作及呈现。
+3.在article/中创建forms.py文件，并写入如下代码：
+	article/forms.py
+
+	# 引入表单类
+	from django import forms
+	# 引入文章模型
+	from .models import ArticlePost
+
+	# 写文章的表单类 继承了Django的表单类forms.ModelForm
+	class ArticlePostForm(forms.ModelForm):
+		class Meta:
+			# 指明数据模型来源
+			model = ArticlePost
+			# 定义表单包含的字段
+			fields = ('title', 'body')
+4.在ArticlePost模型中，created和updated字段为自动生成，不需要填入
+5.author字段暂时固定为id=1的管理员用户，也不用填入
+6.改写article/views.py，添加一个视图函数以处理写文章的请求：
+	article/views.py
+
+	...
+
+	# 引入redirect重定向模块
+	from django.shortcuts import render, redirect
+	# 引入HttpResponse
+	from django.http import HttpResponse
+	# 引入刚才定义的ArticlePostForm表单类
+	from .forms import ArticlePostForm
+	# 引入User模型
+	from django.contrib.auth.models import User
+
+	...
+
+	# 写文章的视图
+	def article_create(request):
+		# 判断用户是否提交数据
+		if request.method == "POST":
+			# 将提交的数据赋值到表单实例中
+			article_post_form = ArticlePostForm(data=request.POST)
+			# 判断提交的数据是否满足模型的要求
+			if article_post_form.is_valid():
+				# 保存数据，但暂时不提交到数据库中
+				new_article = article_post_form.save(commit=False)
+				# 指定数据库中 id=1 的用户为作者
+				# 如果你进行过删除数据表的操作，可能会找不到id=1的用户
+				# 此时请重新创建用户，并传入此用户的id
+				new_article.author = User.objects.get(id=1)
+				# 将新文章保存到数据库中
+				new_article.save()
+				# 完成后返回到文章列表
+				return redirect("article:article_list")
+			# 如果数据不合法，返回错误信息
+			else:
+				return HttpResponse("表单内容有误，请重新填写。")
+		# 如果用户请求获取数据
+		else:
+			# 创建表单类实例
+			article_post_form = ArticlePostForm()
+			# 赋值上下文
+			context = { 'article_post_form': article_post_form }
+			# 返回模板
+			return render(request, 'article/create.html', context)
+7.Forms类的详细解释	https://docs.djangoproject.com/zh-hans/2.1/ref/forms/api/
+8.在templates/article/中创建create.html：
+	templates/article/create.html
+
+	<!-- extends表明此页面继承自 base.html 文件 -->
+	{% extends "base.html" %} {% load staticfiles %}
+	<!-- 写入 base.html 中定义的 title -->
+	{% block title %} 写文章 {% endblock title %}
+	<!-- 写入 base.html 中定义的 content -->
+	{% block content %}
+	<!-- 写文章表单 -->
+	<div class="container">
+		<div class="row">
+			<div class="col-12">
+				<br>
+				<!-- 提交文章的表单 -->
+				<form method="post" action=".">
+					<!-- Django中需要POST数据的地方都必须有csrf_token，它是Django中一个与网络安全相关的中间件验证 -->
+					{% csrf_token %}
+					<!-- 文章标题 -->
+					<div class="form-group">
+						<!-- 标签 -->
+						<label for="title">文章标题</label>
+						<!-- 文本框 -->
+						<input type="text" class="form-control" id="title" name="title">
+					</div>
+					<!-- 文章正文 -->
+					<div class="form-group">
+						<label for="body">文章正文</label>
+						<!-- 文本区域 -->
+						<textarea type="text" class="form-control" id="body" name="body" rows="12"></textarea>
+					</div>
+					<!-- 提交按钮 -->
+					<button type="submit" class="btn btn-primary">完成</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	{% endblock content %}
+9.在article/urls.py中增加一个写文章的url地址：
+	article/urls.py
+	
+	urlpatterns = [
+		...
+
+		# 写文章
+		path('article-create/', views.article_create, name='article_create'),
+	]
+
+
+优化写文章入口
+1.将下列代码加入到templates/header.html中：
+	<li class="nav-item">
+		<a class="nav-link" href="{% url 'article:article_create' %}">写文章</a>
+	</li>
+
+
+
+
+---------------------------------------------------------------------------------------
+不安全的方式
+1.增加一个视图函数：
+	article/views.py
+
+	...
+
+	# 删文章
+	def article_delete(request, id):
+		# 根据 id 获取需要删除的文章
+		article = ArticlePost.objects.get(id=id)
+		# 调用.delete()方法删除文章
+		article.delete()
+		# 完成删除后返回文章列表
+		return redirect("article:article_list")
+2.写入路由信息：
+	article/urls.py
+
+	...
+
+	urlpatterns = [
+		...
+		# 删除文章
+		path('article-delete/<int:id>/', views.article_delete, name='article_delete'),
+	]
+3.修改模板detail.html(为了能在文章详情的页面进行删除的操作)：
+	templates/article/detail.html
+
+	...
+
+	<!-- 文章详情 -->
+	<div class="container">
+		<div class="row">
+			...
+			<div class="col-12 alert alert-success">作者：{{ article.author }}
+			 · <a href="{% url "article:article_delete" article.id %}">删除文章</a>
+			</div>
+			...
+		</div>
+	</div>
+
+	...
+
+
+增加弹窗
+1.下载Layer插件：https://layer.layui.com/
+2.解压后将里面的layer文件夹（含有layer.js的）直接复制到项目的static文件夹下。
+3.为了未来在所有页面都能使用Layer弹窗功能，在base.html中通过标签引入：
+	templates/base.html
+
+	...
+
+	<body>
+		...
+
+		<!-- bootstrap.js 依赖 jquery.js 和popper.js，因此在这里引入 -->
+		<script src="{% static 'jquery/jquery-3.3.1.js' %}"></script>
+		...
+		<!-- 引入layer.js -->
+		<script src="{% static 'layer/layer.js' %}"></script>
+	</body>
+
+	...
+4.layer插件依赖jquery才能正常工作，因此要在jquery的后面引入layer。
+5.改写模板文件detail.html：
+	templates/article/detail.html
+
+	...
+
+	<!-- 文章详情 -->
+	<div class="container">
+		<div class="row">
+			...
+			<div class="col-12 alert alert-success">作者：{{ article.author }}
+			 · <a href="#" onclick="confirm_delete()">删除文章</a>
+			</div>
+			...
+		</div>
+	</div>
+
+	<script>
+		// 删除文章的函数
+		function confirm_delete() {
+			// 调用layer弹窗组件
+			layer.open({
+				// 弹窗标题
+				title: "确认删除",
+				// 正文
+				content: "确认删除这篇文章吗？",
+				// 点击确定按钮后调用的回调函数
+				yes: function(index, layero) {
+					// 指定应当前往的 url
+					location.href='{% url "article:article_delete" article.id %}'
+				},
+			})
+		}
+	</script>
+
+	{% endblock content %}
+
+
+安全的方式（跨域请求伪造攻击，也称为CSRF攻击）
+1.防范：删除文章时用POST方法，并且校验csrf令牌。
+2.修改删除文章的链接，以及点击它时调用的函数：
+	templates/article/detail.html
+
+	...
+	<!-- · <a href="#" onclick="confirm_delete()">删除文章</a> -->
+	· <a href="#" onclick="confirm_safe_delete()">删除文章</a>
+	<!-- 新增一个隐藏的表单 -->
+	<form 
+		  style="display:none;" 
+		  id="safe_delete"
+		  action="{% url 'article:article_safe_delete' article.id %}" 
+		  method="POST"
+		  >
+		{% csrf_token %}
+		<button type="submit">发送</button>
+	</form>
+
+	...
+
+	<script>
+	...
+	function confirm_safe_delete() {
+		layer.open({
+			title: "确认删除",
+			content: "确认删除这篇文章吗？",
+			yes: function(index, layero) {
+				$('form#safe_delete button').click();
+				layer.close(index);
+			}
+		})
+	}
+	</script>
+3.添加表单提交的url：
+	article/urls.py
+
+	...
+	urlpatterns = [
+		...
+		# 安全删除文章
+		path(
+			'article-safe-delete/<int:id>/',
+			views.article_safe_delete,
+			name='article_safe_delete'
+		),
+	]
+4.将新的删除视图写好：
+	article/views.py
+
+	...
+	# 安全删除文章
+	def article_safe_delete(request, id):
+		if request.method == 'POST':
+			article = ArticlePost.objects.get(id=id)
+			article.delete()
+			return redirect("article:article_list")
+		else:
+			return HttpResponse("仅允许post请求")
+5.默认配置下所有的 POST 请求都由 Django 中间件帮你验证了。
+6.CSRF攻击的防范。记住一条，凡是重要的数据操作，都应该考虑带有 csrf 令牌的 POST 请求；
+	或者更简单的方法，数据查询用 GET，数据更改用 POST。
+
+
+
+
+---------------------------------------------------------------------------------------
+视图函数
+1.在ariticle/views.py中增加修改文章的视图函数article_update()：
+	article/views.py
+
+	...
+
+	# 更新文章
+	def article_update(request, id):
+		"""
+		更新文章的视图函数
+		通过POST方法提交表单，更新titile、body字段
+		GET方法进入初始表单页面
+		id： 文章的 id
+		"""
+
+		# 获取需要修改的具体文章对象
+		article = ArticlePost.objects.get(id=id)
+		# 判断用户是否为 POST 提交表单数据
+		if request.method == "POST":
+			# 将提交的数据赋值到表单实例中
+			article_post_form = ArticlePostForm(data=request.POST)
+			# 判断提交的数据是否满足模型的要求
+			if article_post_form.is_valid():
+				# 保存新写入的 title、body 数据并保存
+				article.title = request.POST['title']
+				article.body = request.POST['body']
+				article.save()
+				# 完成后返回到修改后的文章中。需传入文章的 id 值
+				return redirect("article:article_detail", id=id)
+			# 如果数据不合法，返回错误信息
+			else:
+				return HttpResponse("表单内容有误，请重新填写。")
+
+		# 如果用户 GET 请求获取数据
+		else:
+			# 创建表单类实例
+			article_post_form = ArticlePostForm()
+			# 赋值上下文，将 article 文章对象也传递进去，以便提取旧的内容
+			context = { 'article': article, 'article_post_form': article_post_form }
+			# 将响应返回到模板中
+			return render(request, 'article/update.html', context)
+2.redirect函数没有返回文章列表，而是返回到修改后的文章页面去了，
+	因此需要同时把文章的id也打包传递进去，这是url所规定的
+
+
+编写模板
+1.新建templates/article/update.html并写入：
+	templates/article/update.html
+
+	{% extends "base.html" %} {% load staticfiles %}
+	{% block title %} 更新文章 {% endblock title %}
+	{% block content %}
+	<div class="container">
+		<div class="row">
+			<div class="col-12">
+				<br>
+				<form method="post" action=".">
+					{% csrf_token %}
+					<div class="form-group">
+						<label for="title">文章标题</label>
+						<!-- 在 value 属性中指定文本框的初始值为旧的内容，即 article 对象中的 title 字段 -->
+						<input type="text" class="form-control" id="title" name="title" value="{{ article.title }}">
+					</div>
+					<div class="form-group">
+						<label for="body">文章正文</label>
+						<!-- 文本域不需要 value 属性，直接在标签体中嵌入数据即可 -->
+						<textarea type="text" class="form-control" id="body" name="body" rows="12">{{ article.body }}</textarea>
+					</div>
+					<button type="submit" class="btn btn-primary">完成</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	{% endblock content %}
+2.在模板中，分别将文章旧的标题和正文作为初始值，传递了进去，其他就与新建文章的模板完全没区别了。
+
+
+URL 和入口
+1.配置路由article/urls.py：
+	article/urls.py
+
+	...
+
+	urlpatterns = [
+		...
+
+		# 更新文章
+		path('article-update/<int:id>/', views.article_update, name='article_update'),
+	]
+2.在文章详情页面tempaltes/article/detail.html中添加修改文章的入口：
+	tempaltes/article/detail.html
+
+	...
+	<div class="col-12 alert alert-success">作者：{{ article.author }}
+		· <a href="#" onclick="confirm_delete()">删除文章</a>
+		· <a href="{% url "article:article_update" article.id %}">编辑文章</a>
+	</div>
+
+
+
+
+---------------------------------------------------------------------------------------
+用户管理
+在Django中用app来区别不同功能的模块，达到代码隔离和复用。
+因为用户管理和博客文章的功能不同，因此需要新建一个专门的app。
+1.进入虚拟环境，运行startapp指令创建新的app：
+	python manage.py startapp userprofile
+
+
+再遇表单类
+用户登录时，需要填写账户密码等表单数据，因此又要用到Form表单类。
+1.在userprofile目录中创建表单类的文件forms.py，编写如下代码：
+	/userprofile/forms.py
+
+	# 引入表单类
+	from django import forms
+	# 引入 User 模型
+	from django.contrib.auth.models import User
+
+	# 登录表单，继承了 forms.Form 类
+	class UserLoginForm(forms.Form):
+		username = forms.CharField()
+		password = forms.CharField()
+forms.Form需要手动配置每个字段，它适用于不与数据库进行直接交互的功能
+
+
+编写视图
+1.在userprofile/views.py中写视图函数：
+	/userprofile/views.py
+
+	from django.shortcuts import render, redirect
+	from django.contrib.auth import authenticate, login
+	from django.http import HttpResponse
+	from .forms import UserLoginForm
+
+	# Create your views here.
+
+	def user_login(request):
+		if request.method == 'POST':
+			user_login_form = UserLoginForm(data=request.POST)
+			if user_login_form.is_valid():
+				# .cleaned_data 清洗出合法数据
+				data = user_login_form.cleaned_data
+				# 检验账号、密码是否正确匹配数据库中的某个用户
+				# 如果均匹配则返回这个 user 对象
+				user = authenticate(username=data['username'], password=data['password'])
+				if user:
+					# 将用户数据保存在 session 中，即实现了登录动作
+					login(request, user)
+					return redirect("article:article_list")
+				else:
+					return HttpResponse("账号或密码输入有误。请重新输入~")
+			else:
+				return HttpResponse("账号或密码输入不合法")
+		elif request.method == 'GET':
+			user_login_form = UserLoginForm()
+			context = { 'form': user_login_form }
+			return render(request, 'userprofile/login.html', context)
+		else:
+			return HttpResponse("请使用GET或POST请求数据")
+2.Form不仅负责验证数据，还可以“清洗”它：
+	将其标准化为一致的格式，这个特性使得它允许以各种方式输入特定字段的数据，
+	并且始终产生一致的输出。
+	一旦Form使用数据创建了一个实例并对其进行了验证，
+	就可以通过cleaned_data属性访问清洗之后的数据。
+3.Session在网络应用中，称为“会话控制”，它存储特定用户会话所需的属性及配置信息。
+	当用户在 Web 页之间跳转时，存储在 Session 对象中的变量将不会丢失，
+	而是在整个用户会话中一直存在下去。
+
+
+登录的模板
+1.创建/templates/userprofile/login.html模板：
+	/templates/userprofile/login.html
+
+	{% extends "base.html" %} {% load staticfiles %}
+	{% block title %} 登录 {% endblock title %}
+	{% block content %}
+	<div class="container">
+		<div class="row">
+			<div class="col-12">
+				<br>
+				<form method="post" action=".">
+					{% csrf_token %}
+					<!-- 账号 -->
+					<div class="form-group">
+						<label for="username">账号</label>
+						<input type="text" class="form-control" id="username" name="username">
+					</div>
+					<!-- 密码 -->
+					<div class="form-group">
+						<label for="password">密码</label>
+						<!-- type="password"可以让输入显示小圆点 -->
+						<input type="password" class="form-control" id="password" name="password">
+					</div>
+					<!-- 提交按钮 -->
+					<button type="submit" class="btn btn-primary">提交</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	{% endblock content %}
+2.改写一下tempalates/header.html，把登录的按钮加进去：
+	/tempalates/header.html
+
+	...
+	<ul class="navbar-nav">
+		...
+
+		<li class="nav-item">
+			<a class="nav-link" href="{% url 'article:article_list' %}">文章</a>
+		</li>
+
+		<!-- Django的 if 模板语句  判断用户是否已通过身份验证 -->
+		{% if user.is_authenticated %}
+			<!-- 如果用户已经登录，则显示用户名下拉框 -->
+			<li class="nav-item dropdown">
+				<a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+				  {{ user.username }}
+				</a>
+				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+				  <a class="dropdown-item" href="#">退出登录</a>
+				</div>
+			</li>
+		<!-- 如果用户未登录，则显示 “登录” -->
+		{% else %}
+			<li class="nav-item">
+				<a class="nav-link" href="{% url 'userprofile:login' %}">登录</a>
+			</li>                    
+		<!-- if 语句在这里结束 -->
+		{% endif %}
+	</ul>
+	...
+
+
+url及其他设置  将app配置到项目中去
+1.创建userprofile/urls.py文件：
+	/userprofile/urls.py
+
+	from django.urls import path
+	from . import views
+
+	app_name = 'userprofile'
+
+	urlpatterns = [
+		# 用户登录
+		path('login/', views.user_login, name='login'),
+	]
+2.配置根路由my_blog/urls.py：
+	/my_blog/urls.py
+
+	...
+
+	urlpatterns = [
+		... 
+		# 用户管理
+		path('userprofile/', include('userprofile.urls', namespace='userprofile')),
+	]
+3.配置my_blog/settings.py：
+	my_blog/settings.py
+
+	...
+	INSTALLED_APPS = [
+		...
+		'userprofile',
+	]
+	...
+
+
+用户的退出
+1.添加用户退出的视图：
+	/userprofile/views.py
+
+	...
+	# 引入logout模块
+	from django.contrib.auth import authenticate, login, logout
+
+	...
+	# 用户退出
+	def user_logout(request):
+		logout(request)
+		return redirect("article:article_list")
+2.配置/userprofile/urls.py：
+	/userprofile/urls.py
+
+	...
+
+	urlpatterns = [
+		path('login/', views.user_login, name='login'),
+
+		# 用户退出
+		path('logout/', views.user_logout, name='logout'),
+	]
+3.改动/templates/header.html：
+	/templates/header.html
+
+	...
+	# 改动 href 中的链接指向
+	<a class="dropdown-item" href='{% url "userprofile:logout" %}'>退出登录</a>
+
+	...
+
+
+
+
+---------------------------------------------------------------------------------------
+注册表单类
+1.用户注册时会用到表单来提交账号、密码等数据，所以需要写注册用的表单/userprofile/forms.py：
+	/userprofile/forms.py
+
+	...
+
+	# 注册用户表单
+	class UserRegisterForm(forms.ModelForm):
+		# 复写 User 的密码
+		password = forms.CharField()
+		password2 = forms.CharField()
+
+		class Meta:
+			model = User
+			fields = ('username', 'email')
+
+		# 对两次输入的密码是否一致进行检查
+		def clean_password2(self):
+			data = self.cleaned_data
+			if data.get('password') == data.get('password2'):
+				return data.get('password')
+			else:
+				raise forms.ValidationError("密码输入不一致,请重试。")
+2.覆写某字段之后，内部类class Meta中的定义对这个字段就没有效果了，所以fields不用包含password。
+3.验证密码一致性方法不能写def clean_password()，因为如果你不定义def clean_password2()方法，
+	会导致password2中的数据被Django判定为无效数据从而清洗掉，从而password2属性不存在。
+4.从POST中取值用的data.get('password')是一种稳妥的写法，即使用户没有输入密码也不会导致程序错误而跳出。
+
+
+视图函数
+1.编写注册的视图/userprofile/views.py：
+	/userprofile/views.py
+
+	# 引入 UserRegisterForm 表单类
+	from .forms import UserLoginForm, UserRegisterForm
+
+	# 用户注册
+	def user_register(request):
+		if request.method == 'POST':
+			user_register_form = UserRegisterForm(data=request.POST)
+			if user_register_form.is_valid():
+				new_user = user_register_form.save(commit=False)
+				# 设置密码
+				new_user.set_password(user_register_form.cleaned_data['password'])
+				new_user.save()
+				# 保存好数据后立即登录并返回博客列表页面
+				login(request, new_user)
+				return redirect("article:article_list")
+			else:
+				return HttpResponse("注册表单输入有误。请重新输入~")
+		elif request.method == 'GET':
+			user_register_form = UserRegisterForm()
+			context = { 'form': user_register_form }
+			return render(request, 'userprofile/register.html', context)
+		else:
+			return HttpResponse("请使用GET或POST请求数据")
+
+
+模板和url
+1.新建/templates/userprofile/register.html：
+	/templates/userprofile/register.html
+
+	{% extends "base.html" %} {% load staticfiles %}
+	{% block title %} 登录 {% endblock title %}
+	{% block content %}
+	<div class="container">
+		<div class="row">
+			<div class="col-12">
+				<br>
+				<form method="post" action=".">
+					{% csrf_token %}
+					<!-- 账号 -->
+					<div class="form-group col-md-4">
+						<label for="username">昵称</label>
+						<input type="text" class="form-control" id="username" name="username" required>
+					</div>
+					<!-- 邮箱 -->
+					<div class="form-group col-md-4">
+						<label for="email">Email</label>
+						<input type="text" class="form-control" id="email" name="email">
+					</div>
+					<!-- 密码 -->
+					<div class="form-group col-md-4">
+						<label for="password">设置密码</label>
+						<input type="password" class="form-control" id="password" name="password" required>
+					</div>
+					<!-- 确认密码 -->
+					<div class="form-group col-md-4">
+						<label for="password2">确认密码</label>
+						<input type="password" class="form-control" id="password2" name="password2" required>
+					</div>
+					<!-- 提交按钮 -->
+					<button type="submit" class="btn btn-primary">提交</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	{% endblock content %}
+2.在昵称、密码input 标签中添加了required属性
+3.如果用户不填写带有required属性的字段，表单就不能提交，并提示用户填写。
+4.注册的入口可以放在任何地方,目前放在登录页面中/templates/userprofile/login.html：
+	/templates/userprofile/login.html
+
+	...
+	<div class="col-12">
+		<br>
+		<h5>还没有账号？</h5>
+		<h5>点击<a href='{% url "userprofile:register" %}'>注册账号</a>加入我们吧！</h5>
+		<br>
+		<form method="post" action=".">
+			...
+		</form>
+	</div>
+
+	...
+5.在app中配置路由文件/userprofile/urls.py了：
+	/userprofile/urls.py
+
+	...
+
+	urlpatterns = [
+		...
+		# 用户注册
+		path('register/', views.user_register, name='register'),
+	]
+
+
+
+
+---------------------------------------------------------------------------------------
+权限与视图
+1.在视图中进行简单的用户权限的验证工作。编写/userprofile/views.py：
+	/userprofile/views.py
+
+	from django.contrib.auth.models import User
+	# 引入验证登录的装饰器
+	from django.contrib.auth.decorators import login_required
+
+	...
+
+	@login_required(login_url='/userprofile/login/')
+	def user_delete(request, id):
+		if request.method == 'POST':
+			user = User.objects.get(id=id)
+			# 验证登录用户、待删除用户是否相同
+			if request.user == user:
+				#退出登录，删除数据并返回博客列表
+				logout(request)
+				user.delete()
+				return redirect("article:article_list")
+			else:
+				return HttpResponse("你没有删除操作的权限。")
+		else:
+			return HttpResponse("仅接受post请求。")
+2.@login_required是一个Python装饰器。
+	@login_required要求调用user_delete()函数时，用户必须登录；
+	如果未登录则不执行函数，将页面重定向到/userprofile/login/地址去。
+
+
+模板与url
+1.改写/templates/header.html，新增了删除用户的入口，并且在末尾添加弹窗组件的代码:
+	/templates/header.html
+
+	...
+
+	<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+
+		<!-- 新增 -->
+		<a class="dropdown-item" href="#" onclick="user_delete()">删除用户</a>
+
+		<a class="dropdown-item" href='{% url "userprofile:logout" %}'>退出登录</a>
+	</div>
+
+	...
+
+	<!-- 新增 -->
+	{% if user.is_authenticated %}
+	<form 
+		style="display:none;" 
+		id="user_delete"
+		action="{% url 'userprofile:delete' user.id %}" 
+		method="POST"
+	>
+	{% csrf_token %}
+		<button type="submit">发送</button>
+	</form>
+		<script>
+			function user_delete() {
+				// 调用layer弹窗组件
+				layer.open({
+					title: "确认删除",
+					content: "确认删除用户资料吗？",
+					yes: function(index, layero) {
+						$('form#user_delete button').click();
+						layer.close(index);
+					},
+				})
+			}
+		</script>
+	{% endif %}
+2.因为删除用户要求用户必须登录，
+	因此就把它的入口放在登陆后才显示的下拉框中，这样页面可以更加简洁。
+	当然这种方式并不是最佳的选择，通常的做法是把删除功能放在独立的用户资料页面中。
+3.在base.html已经引用了弹窗组件模块，而header.html是拼接在base.html中的，因此就不用再重复引用弹窗组件了。
+4.写好/userprofile/urls.py的路由映射：
+	/userprofile/urls.py
+
+	urlpatterns = [
+		...
+		# 用户删除
+		path('delete/<int:id>/', views.user_delete, name='delete'),
+	]
+
+
+
+
+---------------------------------------------------------------------------------------未测试
+重置用户密码
+一种比较常用的方式是发送一封修改密码的邮件到用户事先绑定的邮箱里。
+1.向用户邮箱发送包含重置密码地址的邮件。邮件的地址需要动态生成，防止不怀好意的用户从中捣乱；
+2.向网站用户展示一条发送邮件成功的信息；
+3.用户点击邮箱中的地址后，转入重置密码的页面；
+4.向用户展示一条重置成功的信息。
+
+
+安装第三方库
+1.打开虚拟环境，输入指令pip install -U django-password-reset：
+
+
+快速使用
+1.在/my_blog/settings.py中注册：
+	/my_blog/settings.py
+
+	...
+	INSTALLED_APPS = [
+		...
+
+		'password_reset',    # 新增
+
+		'article',
+		'userprofile',
+	]
+	...
+2.在根路由/my_blog/urls.py中添加app的地址：
+	/my_blog/urls.py
+
+	...
+	urlpatterns = [
+		...
+		path('password-reset/', include('password_reset.urls')),
+	]
+3.修改/templates/userprofile/login.html，提供一个重置密码的入口：
+	/templates/userprofile/login.html
+
+	...
+	<div class="col-12">
+		...
+		<form method="post" action=".">
+			...
+		</form>
+
+		<!-- 新增 -->
+		<br>
+		<h5>忘记密码了？</h5>
+		<h5>点击<a href='{% url "password_reset_recover" %}'>这里</a>重置密码</h5>
+	</div>
+	...
+4.在/my_blog/settings.py末尾添加发送邮箱的相关配置：
+	/my_blog/settings.py
+
+	...
+
+	# SMTP服务器，改为你的邮箱的smtp!
+	EMAIL_HOST = 'smtp.qq.com'
+	# 改为你自己的邮箱名！
+	EMAIL_HOST_USER = 'your_email_account@xxx.com'
+	# 你的邮箱密码
+	EMAIL_HOST_PASSWORD = 'your_password'
+	# 发送邮件的端口
+	EMAIL_PORT = 25
+	# 是否使用 TLS
+	EMAIL_USE_TLS = True
+	# 默认的发件人
+	DEFAULT_FROM_EMAIL = 'xxx的博客 <your_email_account@xxx.com>'
+5.官方文档	https://django-password-reset.readthedocs.io/en/latest/index.html
+
+
+
+
+---------------------------------------------------------------------------------------未测试
+扩展User模型
+在大多数情况下，使用模型一对一链接的方法是比较适合的。
+1.编写userprofile/models.py如下：
+	userprofile/models.py
+
+	from django.db import models
+	from django.contrib.auth.models import User
+	# 引入内置信号
+	from django.db.models.signals import post_save
+	# 引入信号接收器的装饰器
+	from django.dispatch import receiver
+
+
+	# 用户扩展信息
+	class Profile(models.Model):
+		# 与 User 模型构成一对一的关系
+		user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+		# 电话号码字段
+		phone = models.CharField(max_length=20, blank=True)
+		# 头像
+		avatar = models.ImageField(upload_to='avatar/%Y%m%d/', blank=True)
+		# 个人简介
+		bio = models.TextField(max_length=500, blank=True)
+
+		def __str__(self):
+			return 'user {}'.format(self.user.username)
+
+
+	# 信号接收函数，每当新建 User 实例时自动调用
+	@receiver(post_save, sender=User)
+	def create_user_profile(sender, instance, created, **kwargs):
+		if created:
+			Profile.objects.create(user=instance)
+
+
+	# 信号接收函数，每当更新 User 实例时自动调用
+	@receiver(post_save, sender=User)
+	def save_user_profile(sender, instance, **kwargs):
+		instance.profile.save()
+2.每次新增、修改Model后，必须数据迁移。
+3.信号机制
+	Django包含一个“信号调度程序”，它可以在框架中的某些位置发生操作时，通知其他应用程序。
+	简而言之，信号允许某些发送者通知一组接收器已经发生了某个动作。
+	当许多代码可能对同一事件感兴趣时，信号就特别有用。
+4.有了信号之后还需要定义接收器，告诉Django应该把信号发给谁。
+	装饰器receiver就起到接收器的作用。
+	每当User有更新时，就发送一个信号启动post_save相关的函数。
+5.为什么删除User表不需要信号？
+	答案是两者的关系采用了models.CASCADE级联删除，已经带有关联删除的功能了。
+
+
+重建数据库
+每次改动模型后都需要进行数据的迁移。
+1.由于avatar字段为图像字段，需要安装第三方库Pillow来支持（虚拟环境中，my_blog文件夹下）：
+	pip install Pillow
+2.安装成功后，通过makemigrations、migrate迁移数据：
+	python manage.py makemigrations
+	python manage.py migrate
+3.迁移好数据后，如果你试图登录用户，会得到报错。
+	这是因为之前创建的User数据都没有对应的Profile模型，违背了现有的模型。
+4.在虚拟环境中输入python manage.py shell就可以进入shell：
+	shell是Django提供的互动解释器，
+	你可以在这个指令模式中试验代码是否能够正确执行，是相当方便的工具。
+5.输入下面两行指令就可以轻松删除User数据库：
+	from django.contrib.auth.models import User
+	User.objects.all().delete()
+6.随着User的删除，相关的文章也一并删除了。（article模型中，与User的外键也采用了models.CASCADE级联删除模式）
+7.输入exit()退出shell
+8.输入指令python manage.py createsuperuser，重新创建管理员账户。
+
+
+表单、视图和模板
+1.新建一个表单类去编辑它的内容：
+	userprofile/forms.py
+
+	...
+	# 引入 Profile 模型
+	from .models import Profile
+
+	...
+	class ProfileForm(forms.ModelForm):
+		class Meta:
+			model = Profile
+			fields = ('phone', 'avatar', 'bio')
+2.在userprofile/views.py中写处理用户信息的视图函数：
+	userprofile/views.py
+
+	...
+
+	# 别忘了引入模块
+	from .forms import ProfileForm
+	from .models import Profile
+
+	...
+
+	# 编辑用户信息
+	@login_required(login_url='/userprofile/login/')
+	def profile_edit(request, id):
+		user = User.objects.get(id=id)
+		# user_id 是 OneToOneField 自动生成的字段
+		profile = Profile.objects.get(user_id=id)
+
+		if request.method == 'POST':
+			# 验证修改数据者，是否为用户本人
+			if request.user != user:
+				return HttpResponse("你没有权限修改此用户信息。")
+
+			profile_form = ProfileForm(data=request.POST)
+			if profile_form.is_valid():
+				# 取得清洗后的合法数据
+				profile_cd = profile_form.cleaned_data
+				profile.phone = profile_cd['phone']
+				profile.bio = profile_cd['bio']
+				profile.save()
+				# 带参数的 redirect()
+				return redirect("userprofile:edit", id=id)
+			else:
+				return HttpResponse("注册表单输入有误。请重新输入~")
+
+		elif request.method == 'GET':
+			profile_form = ProfileForm()
+			context = { 'profile_form': profile_form, 'profile': profile, 'user': user }
+			return render(request, 'userprofile/edit.html', context)
+		else:
+			return HttpResponse("请使用GET或POST请求数据")
+3.新建模板文件/templates/userprofile/edit.html：
+	/templates/userprofile/edit.html
+
+	{% extends "base.html" %} {% load staticfiles %}
+	{% block title %} 用户信息 {% endblock title %}
+	{% block content %}
+	<div class="container">
+		<div class="row">
+			<div class="col-12">
+				<br>
+				<div class="col-md-4">用户名: {{ user.username }}</div>
+				<br>
+				<form method="post" action=".">
+					{% csrf_token %}
+					<!-- phone -->
+					<div class="form-group col-md-4">
+						<label for="phone">电话</label>
+						<input type="text" class="form-control" id="phone" name="phone" value="{{ profile.phone }}">
+					</div>
+					<!-- bio -->
+					<div class="form-group col-md-4">
+						<label for="bio">简介</label>
+						<textarea type="text" class="form-control" id="bio" name="bio" rows="12">{{ profile.bio }}</textarea>
+					</div>
+					<!-- 提交按钮 -->
+					<button type="submit" class="btn btn-primary">提交</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	{% endblock content %}
+4.配置userprofile/urls.py：
+	userprofile/urls.py
+
+	...
+	urlpatterns = [
+		...
+		# 用户信息
+		path('edit/<int:id>/', views.profile_edit, name='edit'),
+	]
+5.再给个人信息添加一个入口。修改/templates/header.html：
+	/templates/header.html
+
+	...
+	<div class="dropdown-menu" aria-labelledby="navbarDropdown">
+		<a class="dropdown-item" href='{% url "userprofile:edit" user.id %}'>个人信息</a>
+		...
+	</div>
+	...
+
+
+修改article视图
+1.修改def article_create()：
+	/article/views.py
+
+	...
+	from django.contrib.auth.decorators import login_required
+
+	...
+
+	# 检查登录
+	@login_required(login_url='/userprofile/login/')
+	def article_create(request):
+		...
+		# 指定目前登录的用户为作者
+		new_article.author = User.objects.get(id=request.user.id)
+		...
+2.删除文章article_delete()、更新文章article_update()也应该对用户身份进行检查。
+
+
+配置admin
+1.在admin中将User、Profile合并为一张完整的表格。
+	/userprofile/admin.py
+
+	from django.contrib import admin
+	from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+	from django.contrib.auth.models import User
+
+	from .models import Profile
+
+	# 定义一个行内 admin
+	class ProfileInline(admin.StackedInline):
+		model = Profile
+		can_delete = False
+		verbose_name_plural = 'UserProfile'
+
+	# 将 Profile 关联到 User 中
+	class UserAdmin(BaseUserAdmin):
+		inlines = (ProfileInline,)
+
+	# 重新注册 User
+	admin.site.unregister(User)
+	admin.site.register(User, UserAdmin)
+
+
+如果不使用信号机制
+1.修改model，把两个信号接收函数去除：
+	userprofile/models.py
+
+	from django.db import models
+	from django.contrib.auth.models import User
+
+	class Profile(models.Model):
+		user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+		phone = models.CharField(max_length=20, blank=True)
+		avatar = models.ImageField(upload_to='avatar/%Y%m%d/', blank=True)
+		bio = models.TextField(max_length=500, blank=True)
+
+		def __str__(self):
+			return 'user {}'.format(self.user.username)
+
+	# 下面的信号接收函数全部注释掉
+	...
+2.每次新增、修改Model后，必须数据迁移。
+3.修改view，使得Profile表根据是否已经存在而动态的创建、获取：
+	userprofile/views.py
+
+	...
+
+	# 编辑用户信息
+	@login_required(login_url='/userprofile/login/')
+	def profile_edit(request, id):
+		user = User.objects.get(id=id)
+
+		# 旧代码
+		# profile = Profile.objects.get(user_id=id)
+		# 修改后的代码
+		if Profile.objects.filter(user_id=id).exists():
+			profile = Profile.objects.get(user_id=id)
+		else:
+			profile = Profile.objects.create(user=user)
+
+		...
+4.除了上面的方法，还有别的手段解决此问题：
+	取消Profile在后台的内联，避免创建User的同时创建此表。
+	覆写User表的save()方法，跳过后台的自动保存。（不推荐）
+
+
+
+
+---------------------------------------------------------------------------------------未测试
+上传头像图片
+必要的设置
+1.图片属于一种媒体文件，它与静态文件类似，需要设置一个统一的目录，便于集中存储和访问。
+	这类需要框架统一设置的参数，当然应该在/my_blog/settings.py中。在底部加上：
+	/my_blog/settings.py
+
+	...
+
+	# 媒体文件地址
+	MEDIA_URL = '/media/'
+	MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+2.在/my_blog/urls.py添加下面的语句：
+	/my_blog/urls.py
+
+	...
+	# 新引入的模块
+	from django.conf import settings
+	from django.conf.urls.static import static
+
+	urlpatterns = [
+		...
+	]
+
+	#添加这行
+	urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+编写MTV
+1.需要修改视图，使之能够对图片进行处理：
+	/userprofile/views.py
+
+	...
+	@login_required(login_url='/userprofile/login/')
+	def profile_edit(request, id):
+		...
+
+		# 修改本行
+		# 上传的文件保存在 request.FILES 中，通过参数传递给表单类
+		profile_form = ProfileForm(request.POST, request.FILES)
+
+		if profile_form.is_valid():
+			...
+
+			# 添加在 profile.bio = profile_cd['bio'] 后面
+			# 如果 request.FILES 存在文件，则保存
+			if 'avatar' in request.FILES:
+				profile.avatar = profile_cd["avatar"]
+
+			...
+2.修改模板文件，添加代码显示、处理用户的头像：
+	/templates/userprofile/edit.html
+
+	...
+
+	{% if profile.avatar %}
+		<div class="col-md-4">头像</div>
+		<img src="{{ profile.avatar.url }}" style="max-width: 20%; border-radius: 15%;" class="col-md-4">
+	{% else %}
+		<h5 class="col-md-4">暂无头像</h5>
+	{% endif %}
+	<br>
+	<br>
+	<form ... enctype="multipart/form-data">{% csrf_token %}
+		<!-- avatar -->
+		<div class="form-group">
+			<label for="avatar">上传头像</label>
+			<input type="file" class="form-control-file" name="avatar" id="avatar">
+		</div>
+
+		...
+3.表单必须设置enctype="multipart/form-data"属性，才能够正确上传图片等文件。
+
+
+
+
+---------------------------------------------------------------------------------------
+文章分页
+利用轮子（Paginator类）
+1.修改article/views.py的def article_list()视图：
+	article/views.py
+
+	...
+	# 引入分页模块
+	from django.core.paginator import Paginator
+
+	def article_list(request):
+		# 修改变量名称（articles -> article_list）
+		article_list = ArticlePost.objects.all()
+
+		# 每页显示 3 篇文章
+		paginator = Paginator(article_list, 3)
+		# 获取 url 中的页码
+		page = request.GET.get('page')
+		# 将导航对象相应的页码内容返回给 articles
+		articles = paginator.get_page(page)
+		# 需要传递给模板（templates）的对象
+		context = { 'articles': articles }
+		# render函数：载入模板，并返回context对象
+		return render(request, 'article/list.html', context)
+
+	...
+2.改写模板，在最末尾的</div>前面，加入分页的内容：
+	templates/article/list.html
+
+	...
+
+	<!-- 页码导航 -->
+	<div class="pagination row">
+		<div class="m-auto">
+			<span class="step-links">
+				<!-- 如果不是第一页，则显示上翻按钮 -->
+				{% if articles.has_previous %}
+					<a href="?page=1" class="btn btn-success">
+						&laquo; 1
+					</a>
+					<span>...</span>
+					<a href="?page={{ articles.previous_page_number }}" 
+					   class="btn btn-secondary"
+					>
+						{{ articles.previous_page_number }}
+					</a>
+				{% endif %}
+
+				<!-- 当前页面 -->
+				<span class="current btn btn-danger btn-lg">
+					{{ articles.number }}
+				</span>
+
+				<!-- 如果不是最末页，则显示下翻按钮 -->
+				{% if articles.has_next %}
+					<a href="?page={{ articles.next_page_number }}"
+					   class="btn btn-secondary"
+					>
+						{{ articles.next_page_number }}
+					</a>
+					<span>...</span>
+					<a href="?page={{ articles.paginator.num_pages }}"
+					   class="btn btn-success"
+					>
+						{{ articles.paginator.num_pages }} &raquo;
+					</a>
+				{% endif %}
+			</span>
+		</div>
+	</div>
+
+	...
+
+
+
+
+---------------------------------------------------------------------------------------
+统计文章浏览量、
+1.很多大型网站都会使用如Redis这样的读写速度非常快的内存数据库辅助存储。
+2.目前粗略统计即可
+
+
+模型
+1.修改文章的模型：
+	article/models.py
+
+	...
+	class ArticlePost(models.Model):
+		...
+
+		total_views = models.PositiveIntegerField(default=0)
+
+		...
+2.修改完数据库别忘了要数据迁移，否则更改不会生效。
+	由于新字段设置了初始值，迁移会很顺畅：
+	python manage.py makemigrations
+	python manage.py migrate
+
+
+列表模板
+1.修改文章列表的模板：
+	templates/article/list.html
+
+	...
+
+	<div class="card-footer">
+		<!-- 已有代码 -->
+		<a href="{% url 'article:article_detail' article.id %}"
+			class="btn btn-primary">
+			阅读本文
+		</a>
+
+		<!-- 显示浏览量 -->
+		<span>
+			<small class="col align-self-end" style="color: gray;">
+				浏览: {{ article.total_views }}
+			</small>
+		</span>
+
+	</div>
+
+	...
+
+
+详情模板
+1.修改article/detail.html模板文件（顺便加个权限管理）：
+	templates/article/detail.html
+
+	...
+	<!-- 文章详情 -->
+	<div class="container">
+		<div class="row">
+			...
+			<div class="col-12 alert alert-success">
+				<div>
+					作者：{{ article.author }}
+					{% if user == article.author %}
+						· <a href="#" onclick="confirm_delete()">删除文章</a>
+						· <a href="{% url "article:article_update" article.id %}">
+							编辑文章
+						</a>
+					{% endif %}
+				</div>
+				<div>
+					浏览：{{ article.total_views }}
+				</div>
+			</div>
+			...
+	</div>
+	...
+
+
+视图
+每当用户访问详情页面时，浏览量就加1。
+1.修改article_detail()如下：
+	article/views.py
+
+	...
+	def article_detail(request, id):
+		article = ArticlePost.objects.get(id=id)
+
+		# 浏览量 +1
+		article.total_views += 1
+		article.save(update_fields=['total_views'])
+
+		...
+2.update_fields=[]指定了数据库只更新total_views字段，优化执行效率。
+
+
+视图中鉴权
+光是在模板中鉴权是不够的，必须在后端业务逻辑中再次验证用户身份。
+1.修改article_update()更新文章的视图：
+	article/views.py
+
+	...
+	# 提醒用户登录
+	@login_required(login_url='/userprofile/login/')
+	def article_update(request, id):
+		# 已有代码
+		article = ArticlePost.objects.get(id=id)
+
+		# 过滤非作者的用户
+		if request.user != article.author:
+			return HttpResponse("抱歉，你无权修改这篇文章。")
+
+		...
+2.删除文章也应该做类似的工作
+
+
+
+
+---------------------------------------------------------------------------------------
+根据浏览量对最热文章排序
+1.文章的模型已经有了，不需要写Model了
+2.写一个视图函数article_list_by_views()，取出按浏览排序后的文章对象
+3.将文章对象传递到模板，并进行渲染
+4.但这样，代码会越来越臃肿且不可维护！！！
+5.可以尝试将排序功能融合到已有的视图/路由中。
+
+视图
+1.重写article_list()：
+	article/views.py
+
+	...
+	# 重写文章列表
+	def article_list(request):
+		# 根据GET请求中查询条件
+		# 返回不同排序的对象数组
+		if request.GET.get('order') == 'total_views':
+			# 模型中有total_views这个整数字段，因此‘total_views’为正序
+			# 修改变量名称（articles -> article_list）
+			article_list = ArticlePost.objects.all().order_by('-total_views')
+			order = 'total_views'
+		else:
+			article_list = ArticlePost.objects.all()
+			order = 'normal'
+		# 每页显示 6 篇文章
+		paginator = Paginator(article_list, 6)
+		# 获取 url 中的页码
+		page = request.GET.get('page')
+		# 将导航对象相应的页码内容返回给 articles
+		articles = paginator.get_page(page)
+		# 需要传递给模板（templates）的对象
+		context = { 'articles': articles, 'order': order }
+		# render函数：载入模板，并返回context对象
+		return render(request, 'article/list.html', context)
+2.修改文章列表模板：优化入口，并且正确分页：
+	templates/article/list.html
+
+	...
+
+	<div class="container">
+		<nav aria-label="breadcrumb">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item">
+					<a href="{% url 'article:article_list' %}">
+						最新
+					</a>
+				</li>
+				<li class="breadcrumb-item">
+					<a href="{% url 'article:article_list' %}?order=total_views">
+						最热
+					</a>
+				</li>
+			</ol>
+		</nav>
+
+		<div class="row mt-2">
+			{% for article in articles %}
+			...
+			{% endfor %}
+		</div>
+
+	<!-- 页码导航 -->
+	...
+	<a href="?page=1&order={{ order }}" class="btn btn-success">&laquo; 1</a>
+	...
+	<a href="?page={{ articles.previous_page_number }}&order={{ order }}" 
+	   class="btn btn-secondary">...</a>
+	...
+		{% if articles.has_next %}
+	<a href="?page={{ articles.next_page_number }}&order={{ order }}"
+	   class="btn btn-secondary">{{ articles.next_page_number }}</a>
+	...
+	<a href="?page={{ articles.paginator.num_pages }}&order={{ order }}"
+	   class="btn btn-success">{{ articles.paginator.num_pages }} &raquo;</a>
+	...
+3.页码导航中，所有的分页链接都新增了order参数
+
+
+
+
+---------------------------------------------------------------------------------------
+搜索和列表有很多类似的地方：
+	它们都是先检索出一些文章对象，并将其展示给用户。
+	因为order是用GET提交的，并且翻页是GET请求，
+	因此选择GET方式提交搜索文本，可以方便地和之前的模块结合起来。
+
+
+Q对象
+1.Model.objects.all()能够返回表中的所有对象。
+2.Model.objects.filter(**kwargs)可以返回与给定参数匹配的部分对象。
+3.对多个参数进行查询时，需要Q对象
+
+
+视图
+1.修改article_list()：
+	article/views.py
+
+	...
+
+	# 引入 Q 对象
+	from django.db.models import Q
+
+	def article_list(request):
+		search = request.GET.get('search')
+		order = request.GET.get('order')
+		# 用户搜索逻辑
+		if search:
+			if order == 'total_views':
+				# 用 Q对象 进行联合搜索
+				# icontains是不区分大小写的包含
+				# 多个Q对象用管道符|隔开
+				# 模型中有total_views这个整数字段，因此‘total_views’为正序
+				# 修改变量名称（articles -> article_list）
+				article_list = ArticlePost.objects.filter(
+					Q(title__icontains=search) |
+					Q(body__icontains=search)
+				).order_by('-total_views')
+			else:
+				article_list = ArticlePost.objects.filter(
+					Q(title__icontains=search) |
+					Q(body__icontains=search)
+				)
+		else:
+			# 将 search 参数重置为空
+			search = ''
+			if order == 'total_views':
+				article_list = ArticlePost.objects.all().order_by('-total_views')
+			else:
+				article_list = ArticlePost.objects.all()
+		# 每页显示 6 篇文章
+		paginator = Paginator(article_list, 6)
+		# 获取 url 中的页码
+		page = request.GET.get('page')
+		# 将导航对象相应的页码内容返回给 articles
+		articles = paginator.get_page(page)
+		# 增加 search 到 context
+		context = { 'articles': articles, 'order': order, 'search': search }
+		# render函数：载入模板，并返回context对象
+		return render(request, 'article/list.html', context)
+
+	...
+2.icontains不区分大小写，对应的contains区分大小写
+3.如果用户没有搜索操作，则search = request.GET.get('search')会使得search = None，因此需要置空
+
+
+模板
+1.修改文章列表的模板文件：
+	templates/article/list.html
+
+	...
+
+	<div class="container">
+		<!-- 修改，面包屑的href增加search参数 -->
+		<nav aria-label="breadcrumb">
+			<ol class="breadcrumb">
+				<li class="breadcrumb-item">
+					<a href="{% url 'article:article_list' %}?search={{ search }}">
+						最新
+					</a>
+				</li>
+				<li class="breadcrumb-item">
+					<a href="{% url 'article:article_list' %}?order=total_views&search={{ search }}">
+						最热
+					</a>
+				</li>
+			</ol>
+		</nav>
+
+		<!-- 新增，搜索栏 -->
+		<div class="row">
+			<div class="col-auto mr-auto">
+				<form class="form-inline" >
+					<label class="sr-only">content</label>
+					<input type="text" 
+						class="form-control mb-2 mr-sm-2" 
+						name="search" 
+						placeholder="搜索文章..." 
+						required
+					>
+				</form>
+			</div>
+		</div>
+
+		<!-- 新增，搜索提示语 -->
+		{% if search %}
+			{% if articles %}
+				<h4><span style="color: red">"{{ search }}"</span>的搜索结果如下：</h4>
+				<hr>        
+			{% else %}
+				<h4>暂无<span style="color: red">"{{ search }}"</span>有关的文章。</h4>
+				<hr>
+			{% endif %}
+		{% endif %}
+
+
+	...
+
+	<!-- 修改，页码href增加search参数 -->
+	<a href="?page=1&order={{ order }}&search={{ search }}" class="btn btn-success">
+	...
+	<a href="?page={{ articles.previous_page_number }}&order={{ order }}&search={{ search }}" class="btn btn-secondary">
+	...
+	<a href="?page={{ articles.next_page_number }}&order={{ order }}&search={{ search }}" class="btn btn-secondary">
+	...
+	<a href="?page={{ articles.paginator.num_pages }}&order={{ order }}&search={{ search }}"class="btn btn-success">
+
+	...
+3.更加复杂、深度定制的搜索可以借助第三方模块，如Haystack。https://github.com/django-haystack/django-haystack
+
+
+
+
+---------------------------------------------------------------------------------------
+文中的目录
+1.修改文章详情视图：
+	article/views.py
+
+	...
+
+	# 文章详情
+	def article_detail(request, id):
+		...
+		article.body = markdown.markdown(article.body,
+			extensions=[
+			'markdown.extensions.extra',
+			'markdown.extensions.codehilite',
+
+			# 目录扩展
+			'markdown.extensions.TOC',
+			]
+		)
+		...
+2.某些版本下 markdown.extensions.TOC 会报错，尝试修改为 markdown.extensions.toc 
+3.一级标题：# title1，二级标题：## title2
+4.可以在文中的任何地方插入[TOC]字符串，目录就自动生成好了：
+
+
+任意位置的目录
+1.修改Markdown的渲染方法：
+	article/views.py
+
+	...
+
+	def article_detail(request, id):
+		...
+
+		# 修改 Markdown 语法渲染
+		md = markdown.Markdown(
+			extensions=[
+			'markdown.extensions.extra',
+			'markdown.extensions.codehilite',
+			'markdown.extensions.toc',
+			]
+		)
+		article.body = md.convert(article.body)
+
+		# 新增了md.toc对象
+		context = { 'article': article, 'toc': md.toc }
+
+		return render(request, 'article/detail.html', context)
+2.注意markdown.markdown()和markdown.Markdown()的区别
+3.修改文章详情模板：
+	templates/article/detail.html
+
+	...
+
+	<div class="container">
+		<div class="row">
+			<!-- 将原有内容嵌套进新的div中 -->
+			<div class="col-9">
+				<h1 class="mt-4 mb-4">{{ article.title }}</h1>
+				<div class="alert alert-success">
+					...
+				</div>
+			</div>
+
+			<!-- 新增的目录 -->
+			<div class="col-3 mt-4">
+				<h4><strong>目录</strong></h4>
+				<hr>
+				<div>
+					{{ toc|safe }}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	...
+4.重新布局，将原有内容装进col-9的容器中，将右侧col-3的空间留给目录
+5.toc需要|safe标签才能正确渲染
+
+
+
+
+---------------------------------------------------------------------------------------
+在博文中发表评论
+1.评论是一个相对独立的功能，因此新建一个评论的app：
+	python manage.py startapp comment
+2.确认app创建成功后，记得在settings.py中注册：
+	my_blog/settings.py
+
+	...
+	INSTALLED_APPS = [
+		...
+		'comment',
+	]
+	...
+
+	TIME_ZONE = 'Asia/BeiJing'
+
+	...
+3.在my_blog/urls.py中注册根路由：
+	my_blog/urls.py
+
+	...
+	urlpatterns = [
+		...
+		# 评论
+		path('comment/', include('comment.urls', namespace='comment')),
+	]
+	...
+
+
+编写核心功能
+1.编写评论的模型：
+	comment/models.py
+
+	from django.db import models
+	from django.contrib.auth.models import User
+	from article.models import ArticlePost
+
+	# 博文的评论
+	class Comment(models.Model):
+		article = models.ForeignKey(
+			ArticlePost,
+			on_delete=models.CASCADE,
+			related_name='comments'
+		)
+		user = models.ForeignKey(
+			User, 
+			on_delete=models.CASCADE, 
+			related_name='comments'
+		)
+		body = models.TextField()
+		created = models.DateTimeField(auto_now_add=True)
+
+		class Meta:
+			ordering = ('created',)
+
+		def __str__(self):
+			return self.body[:20]
+2.每次新增、修改Model后，必须数据迁移。
+
+
+评论的表单
+1.新建表单类：
+	comment/forms.py
+
+	from django import forms
+	from .models import Comment
+
+	class CommentForm(forms.ModelForm):
+		class Meta:
+			model = Comment
+			fields = ['body']
+
+
+评论的url
+1.在comment app中新建路由文件：
+	comment/urls.py
+
+	from django.urls import path
+	from . import views
+
+	app_name = 'comment'
+
+	urlpatterns = [
+		# 发表评论
+		path('post-comment/<int:article_id>/', views.post_comment, name='post_comment'),
+	]
+2.post_comment()视图还没写，先取个名字占位置。
+
+
+评论的视图
+1.评论的视图函数如下：
+	comment/views.py
+
+	from django.shortcuts import render, get_object_or_404, redirect
+	from django.contrib.auth.decorators import login_required
+	from django.http import HttpResponse
+
+	from article.models import ArticlePost
+	from .forms import CommentForm
+
+	# 文章评论
+	@login_required(login_url='/userprofile/login/')
+	def post_comment(request, article_id):
+		article = get_object_or_404(ArticlePost, id=article_id)
+
+		# 处理 POST 请求
+		if request.method == 'POST':
+			comment_form = CommentForm(request.POST)
+			if comment_form.is_valid():
+				new_comment = comment_form.save(commit=False)
+				new_comment.article = article
+				new_comment.user = request.user
+				new_comment.save()
+				return redirect(article)
+			else:
+				return HttpResponse("表单内容有误，请重新填写。")
+		# 处理错误请求
+		else:
+			return HttpResponse("发表评论仅接受POST请求。")
+2.在生产环境下，如果用户请求一个不存在的对象时，get_object_or_404()会返回Error 404。
+3.redirect()：返回到一个适当的url中：即用户发送评论后，重新定向到文章详情页面。
+	当其参数是一个Model对象时，会自动调用这个Model对象的get_absolute_url()方法。
+
+
+文章的模型
+1.在文章模型中添加get_absolute_url()方法：
+	article/models.py
+
+	...
+	# 记得导入
+	from django.urls import reverse
+
+	class ArticlePost(models.Model):
+		...
+
+		# 获取文章地址
+		def get_absolute_url(self):
+			return reverse('article:article_detail', args=[self.id])
+2.每次新增、修改Model后，必须数据迁移。
+
+
+文章详情视图
+1.修改article/views.py中的article_detail()：
+	article/views.py
+
+	...
+
+	from comment.models import Comment
+
+	def article_detail(request, id):
+		# 已有代码
+		article = ArticlePost.objects.get(id=id)
+
+		# 取出文章评论
+		comments = Comment.objects.filter(article=id)
+		...
+
+		# 添加comments上下文
+		context = { 'article': article, 'toc': md.toc, 'comments': comments }
+
+		...
+2.filter()可以取出多个满足条件的对象，而get()只能取出1个
+
+
+文章详情模板
+1.修改文章详情页面：
+	templates/article/detail.html
+
+	...
+
+	<div class="col-9">
+		...
+		<!-- 已有代码，文章正文 -->
+		<div class="col-12">
+			...
+		</div>
+
+		<!-- 发表评论 -->
+		<hr>
+		{% if user.is_authenticated %}
+			<div>
+				<form 
+					action="{% url 'comment:post_comment' article.id %}" 
+					method="POST"
+				>
+				{% csrf_token %}
+					<div class="form-group">
+						<label for="body">
+							<strong>
+								我也要发言：
+							</strong>
+						</label>
+						<textarea 
+							type="text" 
+							class="form-control" 
+							id="body" 
+							name="body" 
+							rows="2"></textarea>
+					</div>
+					<!-- 提交按钮 -->
+					<button type="submit" class="btn btn-primary ">发送</button>                    
+				</form>
+			</div>
+			<br>
+		{% else %}
+			<br>
+			<h5 class="row justify-content-center">
+				请<a href="{% url 'userprofile:login' %}">登录</a>后回复
+			</h5>
+			<br>
+		{% endif %}
+
+
+
+		<!-- 显示评论 -->
+		<h4>共有{{ comments.count }}条评论</h4>
+		<div>
+			{% for comment in comments %}
+				<hr>
+				<p>
+					<strong style="color: pink">
+						{{ comment.user }}
+					</strong> 于 
+					<span style="color: green">
+						{{ comment.created|date:"Y-m-d H:i:s" }}
+					</span> 时说：
+				</p>
+				<pre style="font-family: inherit; font-size: 1em;">
+	{{ comment.body }}</pre>
+			{% endfor %}
+		</div>
+	</div>
+
+	<!-- 目录 -->
+	<div class="col-3 mt-4">
+		...
+	</div>
+
+	...
+2.<pre>定义预格式化的文本，在我们的项目中最关键的作用是保留空格和换行符。
+	在<pre>标签中的文本千万不能缩进。
+
+
+
+
+---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------------------------
